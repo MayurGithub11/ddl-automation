@@ -54,7 +54,7 @@ INFO_ROWS = 5                # number of banner rows (company name, filters, etc
 COL_WIDTHS = {  # tuned to match a readable A4 landscape printout
     "DTC Code": 12,
     "DTC Section Name": 24,
-    "Consumer No": 16,
+    "Consumer No": 18,
     "Name": 32,
     "Address": 40,
     "Meter Number": 14,
