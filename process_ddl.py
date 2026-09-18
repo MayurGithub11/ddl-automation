@@ -64,13 +64,13 @@ COL_WIDTHS = {  # tuned to match a readable A4 landscape printout
     "Closing Balance": 12,
     "Age in Days": 9,
     "Consumers Mobile Number": 14,
-    "TD/PD Date": 30,
+    "TD/PD Date": 10,
 }
 
 THIN = Side(style="thin")
 BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
 HEADER_FONT = Font(name="Arial", size=10, bold=True)
-DATA_FONT = Font(name="Arial", size=11)
+DATA_FONT = Font(name="Arial", size=12)
 BANNER_FONT = Font(name="Arial", size=10, bold=True)
 
 
