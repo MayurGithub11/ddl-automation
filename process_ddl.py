@@ -57,7 +57,7 @@ COL_WIDTHS = {  # tuned to match a readable A4 landscape printout
     "Consumer No": 18,
     "Name": 32,
     "Address": 40,
-    "Meter Number": 14,
+    "Meter Number": 16,
     "Bill Due Date": 12,
     "Last Receipt Date": 12,
     "Bill Amount": 11,
