@@ -32,7 +32,6 @@ from openpyxl.worksheet.worksheet import Worksheet
 # is fine, we strip them automatically).
 # ---------------------------------------------------------------------------
 WANTED_COLUMNS = [
-    "Sr No",
     "DTC Code",
     "DTC Section Name",
     "Consumer No",
@@ -45,7 +44,7 @@ WANTED_COLUMNS = [
     "Closing Balance",
     "Age in Days",
     "Consumers Mobile Number",
-    "Remark",
+    "TD/PD Date",
 ]
 
 HEADER_ROW_IN_RAW = 7        # row where "Sr No, Circle, ..." headers live
@@ -53,7 +52,6 @@ DATA_STARTS_AT_ROW = 8       # first data row in the raw file
 INFO_ROWS = 5                # number of banner rows (company name, filters, etc.) to copy as-is
 
 COL_WIDTHS = {  # tuned to match a readable A4 landscape printout
-    "Sr No": 6,
     "DTC Code": 12,
     "DTC Section Name": 24,
     "Consumer No": 16,
@@ -66,13 +64,13 @@ COL_WIDTHS = {  # tuned to match a readable A4 landscape printout
     "Closing Balance": 12,
     "Age in Days": 9,
     "Consumers Mobile Number": 14,
-    "Remark": 30,
+    "TD/PD Date": 30,
 }
 
 THIN = Side(style="thin")
 BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
 HEADER_FONT = Font(name="Arial", size=10, bold=True)
-DATA_FONT = Font(name="Arial", size=10)
+DATA_FONT = Font(name="Arial", size=11)
 BANNER_FONT = Font(name="Arial", size=10, bold=True)
 
 
