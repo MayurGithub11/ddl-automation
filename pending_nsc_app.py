@@ -1,6 +1,6 @@
 """
 Pending New Service Connection (LT) list - Streamlit feature
-Upload LIST.csv / .zip / .xlsx  ->  choose Division + Sub-division  ->  download clean Excel.
+Upload LIST.csv / .xlsx  ->  choose Division + Sub-division  ->  download clean Excel.
 """
 import io
 import pandas as pd
@@ -62,11 +62,31 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def read_mapping(f) -> dict:
+    """Read DTC->staff mapping from CSV or Excel. Uses first two columns if names differ."""
+    if f.name.lower().endswith((".xlsx", ".xls")):
+        m = pd.read_excel(f, dtype=str)
+    else:
+        m = pd.read_csv(f, dtype=str)
+    m.columns = [str(c).strip().lower().replace(" ", "_") for c in m.columns]
+    dcol = "dtc_code" if "dtc_code" in m.columns else m.columns[0]
+    scol = "staff_name" if "staff_name" in m.columns else m.columns[1]
+    m = m[[dcol, scol]].dropna()
+    keys = m[dcol].str.strip().str.replace(r"\.0$", "", regex=True)
+    return dict(zip(keys, m[scol].str.strip()))
+
+
+def template_excel() -> bytes:
+    bio = io.BytesIO()
+    pd.DataFrame({"dtc_code": [], "staff_name": []}).to_excel(bio, index=False, engine="xlsxwriter")
+    return bio.getvalue()
+
+
 def remove_ag(df: pd.DataFrame) -> pd.DataFrame:
     return df[~df["Category"].str.upper().str.contains(r"\bAG\b", regex=True)]
 
 
-def to_excel(df: pd.DataFrame, by_section: bool) -> bytes:
+def to_excel(df: pd.DataFrame, split_col=None) -> bytes:
     bio = io.BytesIO()
     with pd.ExcelWriter(bio, engine="xlsxwriter") as xw:
         wb = xw.book
@@ -77,7 +97,7 @@ def to_excel(df: pd.DataFrame, by_section: bool) -> bytes:
         widths = {"Division": 20, "Sub-Division": 16, "Section": 18, "DTC": 10,
                   "Category": 12, "Workflow Status": 26, "Application ID": 14,
                   "Consumer Number": 16, "Name": 26, "Address": 40,
-                  "Infra Status": 20, "Report Age": 17, "SOP Remark": 15, "Age Days": 9}
+                  "Line Staff": 16, "Infra Status": 20, "Report Age": 17, "SOP Remark": 15, "Age Days": 9}
 
         def write(sheet, data):
             data = data.reset_index(drop=True)
@@ -93,9 +113,9 @@ def to_excel(df: pd.DataFrame, by_section: bool) -> bytes:
             ws.fit_to_pages(1, 0); ws.repeat_rows(0)     # 1 page wide, repeat header
 
         write("All", df)
-        if by_section:
-            for sec, g in df.groupby("Section"):
-                name = (sec or "No Section")[:28]
+        if split_col:
+            for key, g in df.groupby(split_col):
+                name = (str(key).strip() or "Not mapped")[:28]
                 for ch in '[]:*?/\\':
                     name = name.replace(ch, "")
                 write(name or "Sheet", g)
@@ -125,19 +145,44 @@ def main():
     sel = df[(df["Division"] == division) & (df["Sub-dn"] == sub)]
     out = remove_ag(clean(sel))
     removed = len(sel) - len(out)
-    out = out.sort_values(["Section", "Age Days"], ascending=[True, False])
+
+    # --- Optional: line staff mapping (DTC code -> staff name) ---
+    st.markdown("**Line staff mapping (optional)**")
+    st.download_button("Download blank mapping template (Excel)",
+                       data=template_excel(), file_name="staff_mapping_template.xlsx",
+                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    mp = st.file_uploader("Upload your saved mapping (Excel or CSV: dtc_code, staff_name)",
+                          type=["xlsx", "xls", "csv"])
+    has_map = False
+    if mp:
+        try:
+            lookup = read_mapping(mp)
+            out.insert(out.columns.get_loc("DTC") + 1, "Line Staff",
+                       out["DTC"].map(lookup).fillna(""))
+            has_map = True
+            st.caption(f"{len(lookup)} DTCs in mapping. "
+                       f"{int((out['Line Staff'] == '').sum())} applications have no line staff "
+                       "(DTC missing or not in your mapping).")
+        except Exception as e:
+            st.error(f"Mapping file problem: {e}")
+
+    choices = ["Section", "None"] + (["Line Staff"] if has_map else [])
+    if has_map:
+        choices = ["Line Staff", "Section", "None"]
+    split = st.radio("Separate Excel sheet for each:", choices, horizontal=True)
+    split_col = None if split == "None" else split
+    out = out.sort_values([split_col or "Section", "Age Days"], ascending=[True, False])
 
     c1, c2, c3 = st.columns(3)
     c1.metric("Applications", len(out))
     c2.metric("AG removed", removed)
     c3.metric("Beyond SOP", int(out["SOP Remark"].str.contains("BEYOND").sum()))
 
-    by_section = st.checkbox("Also make a separate sheet for each Section", value=True)
     st.dataframe(out, use_container_width=True, hide_index=True)
 
     st.download_button(
         "Download Excel",
-        data=to_excel(out, by_section),
+        data=to_excel(out, split_col),
         file_name=f"Pending_NSC_{sub.replace('/', '').replace('.', '').strip()}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
