@@ -19,28 +19,36 @@ DEFAULT_SUBDN_KEY = "PAONI"
 
 @st.cache_data(show_spinner="Reading file...")
 def load_file(file_bytes: bytes, filename: str) -> pd.DataFrame:
-    """Read CSV/Excel; auto-detect the header row (the one containing 'Sr.No.')."""
-    buf = io.BytesIO(file_bytes)
-    if filename.lower().endswith((".xlsx", ".xls")):
-        raw = pd.read_excel(buf, header=None, dtype=str)
+    """Read CSV / ZIP(of CSV) / Excel. Loads ONLY the needed columns to save memory."""
+    name = filename.lower()
+    need = ["Sr.No."] + KEEP_COLS
+    if name.endswith((".xlsx", ".xls")):
+        raw = pd.read_excel(io.BytesIO(file_bytes), header=None, dtype=str)
+        hdr = _find_header(raw)
+        df = raw.iloc[hdr + 1:].copy()
+        df.columns = [str(c).strip() for c in raw.iloc[hdr]]
     else:
-        raw = pd.read_csv(buf, header=None, dtype=str, low_memory=False,
-                          encoding_errors="replace")
-    hdr = None
-    for i in range(min(15, len(raw))):
-        if raw.iloc[i].astype(str).str.strip().eq("Sr.No.").any():
-            hdr = i
-            break
-    if hdr is None:
-        raise ValueError("Could not find the header row (a row containing 'Sr.No.').")
-    df = raw.iloc[hdr + 1:].copy()
-    df.columns = [str(c).strip() for c in raw.iloc[hdr]]
-    df = df[df["Sr.No."].notna()]                       # drop blank/footer rows
-    df = df[df["Sr.No."].str.strip() != "Sr.No."]       # drop repeated headers
-    missing = [c for c in KEEP_COLS if c not in df.columns]
+        comp = "zip" if name.endswith(".zip") else None
+        head = pd.read_csv(io.BytesIO(file_bytes), header=None, dtype=str, nrows=15,
+                           compression=comp, encoding_errors="replace")
+        hdr = _find_header(head)
+        df = pd.read_csv(io.BytesIO(file_bytes), header=hdr, dtype=str, low_memory=False,
+                         compression=comp, encoding_errors="replace",
+                         usecols=lambda c: str(c).strip() in need)
+        df.columns = [str(c).strip() for c in df.columns]
+    missing = [c for c in need if c not in df.columns]
     if missing:
         raise ValueError(f"Missing columns in file: {missing}")
-    return df.reset_index(drop=True)
+    df = df[df["Sr.No."].notna()]                       # drop blank/footer rows
+    df = df[df["Sr.No."].str.strip() != "Sr.No."]       # drop repeated headers
+    return df[need].reset_index(drop=True)
+
+
+def _find_header(raw: pd.DataFrame) -> int:
+    for i in range(min(15, len(raw))):
+        if raw.iloc[i].astype(str).str.strip().eq("Sr.No.").any():
+            return i
+    raise ValueError("Could not find the header row (a row containing 'Sr.No.').")
 
 
 def clean(df: pd.DataFrame) -> pd.DataFrame:
@@ -96,7 +104,7 @@ def to_excel(df: pd.DataFrame, by_section: bool) -> bytes:
 
 def main():
     st.title("Pending New Connections - Report")
-    up = st.file_uploader("Upload LIST file (CSV or Excel)", type=["csv", "xlsx", "xls"])
+    up = st.file_uploader("Upload LIST file (CSV, ZIP of CSV, or Excel)", type=["csv", "zip", "xlsx", "xls"])
     if not up:
         return
     try:
