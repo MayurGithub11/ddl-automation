@@ -1,6 +1,6 @@
 """
 Pending New Service Connection (LT) list - Streamlit feature
-Upload LIST.csv / .xlsx  ->  choose Division + Sub-division  ->  download clean Excel.
+Upload LIST.csv / .zip / .xlsx  ->  choose Division + Sub-division  ->  download clean Excel.
 """
 import io
 import pandas as pd
